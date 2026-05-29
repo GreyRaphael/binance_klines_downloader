@@ -64,8 +64,8 @@ fn cleanup_daily_files(dir: &str, symbol: &str, interval: &str, month: &str) {
 
 /// Download one symbol with retry, then save as IPC.
 ///
-/// If `cleanup_monthly` is Some((interval, month)), delete daily files for that month
-/// after a successful monthly download. Skipped on 404 (download fails, no cleanup).
+/// 404 is logged and returns Ok(()) without retry (data not yet published).
+/// Network/server errors are retried up to 5 times with 180s backoff.
 async fn download_one(
     client: &Client,
     symbol: &str,
@@ -130,7 +130,13 @@ async fn download_one(
 
                 return Ok(());
             }
+            Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => {
+                // 404: data not yet published, no point retrying
+                tracing::info!("{}: HTTP 404 — data not available yet, skipping", symbol);
+                return Ok(());
+            }
             Ok(resp) => {
+                // Other HTTP errors (429, 5xx, etc.) — retry
                 tracing::warn!(
                     "Attempt {}/5: HTTP {} for {}. Retrying in 180s...",
                     attempt,
@@ -139,8 +145,9 @@ async fn download_one(
                 );
             }
             Err(e) => {
+                // Network error — retry
                 tracing::warn!(
-                    "Attempt {}/5: {} failed: {:#}. Retrying in 180s...",
+                    "Attempt {}/5: {} network error: {:#}. Retrying in 180s...",
                     attempt,
                     symbol,
                     e
@@ -151,6 +158,7 @@ async fn download_one(
             tokio::time::sleep(tokio::time::Duration::from_secs(180)).await;
         }
     }
+    tracing::error!("{}: failed after 5 attempts, giving up", symbol);
     anyhow::bail!("Failed to download {} after 5 attempts", symbol)
 }
 
