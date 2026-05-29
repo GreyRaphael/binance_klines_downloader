@@ -41,8 +41,38 @@ const KLINE_DTYPES: [DataType; 12] = [
     DataType::Int64,   // ignore
 ];
 
+/// Delete daily IPC files for a given month after successful monthly download.
+fn cleanup_daily_files(dir: &str, symbol: &str, interval: &str, month: &str) {
+    // month format: "2025-05"
+    // Daily file pattern: {symbol}-{interval}-2025-05-*.ipc
+    let prefix = format!("{}-{}-{}-", symbol, interval, month);
+
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if name.starts_with(&prefix) && name.ends_with(".ipc") {
+                let path = entry.path();
+                if let Err(e) = fs::remove_file(&path) {
+                    tracing::warn!("Failed to delete {}: {:#}", path.display(), e);
+                } else {
+                    tracing::info!("Deleted daily file: {}", path.display());
+                }
+            }
+        }
+    }
+}
+
 /// Download one symbol with retry, then save as IPC.
-async fn download_one(client: &Client, symbol: &str, url: &str, output_path: &str) -> Result<()> {
+///
+/// If `cleanup_monthly` is Some((interval, month)), delete daily files for that month
+/// after a successful monthly download. Skipped on 404 (download fails, no cleanup).
+async fn download_one(
+    client: &Client,
+    symbol: &str,
+    url: &str,
+    output_path: &str,
+    cleanup_monthly: Option<(&str, &str)>,
+) -> Result<()> {
     for attempt in 1..=5u32 {
         match client.get(url).send().await {
             Ok(resp) if resp.status().is_success() => {
@@ -90,6 +120,14 @@ async fn download_one(client: &Client, symbol: &str, url: &str, output_path: &st
                     .finish(&mut df)?;
 
                 tracing::info!("Saved {} ({} rows)", output_path, df.height());
+
+                // If monthly download, clean up daily files for this month
+                if let Some((interval, month)) = cleanup_monthly {
+                    if let Some(parent) = Path::new(output_path).parent() {
+                        cleanup_daily_files(&parent.to_string_lossy(), symbol, interval, month);
+                    }
+                }
+
                 return Ok(());
             }
             Ok(resp) => {
@@ -138,6 +176,9 @@ pub async fn dump(config: &AppConfig, frequency: &str, interval: &str, date: &st
     for symbol in &config.symbols {
         let client = client.clone();
         let symbol = symbol.clone();
+        let frequency = frequency.to_string();
+        let interval = interval.to_string();
+        let date = date.to_string();
         let url = format!(
             "https://data.binance.vision/data/futures/um/{}/klines/{}/{}/{}-{}-{}.zip",
             frequency, symbol, interval, symbol, interval, date
@@ -148,7 +189,12 @@ pub async fn dump(config: &AppConfig, frequency: &str, interval: &str, date: &st
         );
 
         join_set.spawn(async move {
-            if let Err(e) = download_one(&client, &symbol, &url, &output_path).await {
+            let cleanup = if frequency == "monthly" {
+                Some((interval.as_str(), date.as_str()))
+            } else {
+                None
+            };
+            if let Err(e) = download_one(&client, &symbol, &url, &output_path, cleanup).await {
                 tracing::error!("{}: {:#}", symbol, e);
             }
         });
@@ -232,6 +278,7 @@ pub async fn backfill(config: &AppConfig, interval: &str, start: &str, end: &str
             let symbol = symbol.clone();
             let frequency = frequency.to_string();
             let date = date.clone();
+            let interval = interval.to_string();
             let url = format!(
                 "https://data.binance.vision/data/futures/um/{}/klines/{}/{}/{}-{}-{}.zip",
                 frequency, symbol, interval, symbol, interval, date
@@ -242,7 +289,12 @@ pub async fn backfill(config: &AppConfig, interval: &str, start: &str, end: &str
             );
 
             join_set.spawn(async move {
-                if let Err(e) = download_one(&client, &symbol, &url, &output_path).await {
+                let cleanup = if frequency == "monthly" {
+                    Some((interval.as_str(), date.as_str()))
+                } else {
+                    None
+                };
+                if let Err(e) = download_one(&client, &symbol, &url, &output_path, cleanup).await {
                     tracing::error!("{}: {:#}", symbol, e);
                 }
             });
