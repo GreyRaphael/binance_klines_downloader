@@ -1,0 +1,9 @@
+proxy = "http://127.0.0.1:2080"
+output_dir = "C:/Users/csc29410/Downloads/llm/klines"
+intervals = ["5m", "15m", "30m", "1h"]
+
+symbols = [
+    "BTCUSDT",
+    "ETHUSDT",
+    "1000PEPEUSDT",
+]

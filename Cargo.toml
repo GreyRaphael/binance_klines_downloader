@@ -1,0 +1,17 @@
+[package]
+name = "rust_downloader"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+reqwest = { version = "0.13", features = ["rustls"] }
+tokio = { version = "1", features = ["full"] }
+chrono = "0.4"
+serde = { version = "1", features = ["derive"] }
+zip = { version = "8.6", features = ["deflate"] }
+polars = { version = "0.53", features = ["ipc", "csv"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+toml = "1"
