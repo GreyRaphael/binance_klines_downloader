@@ -1,8 +1,8 @@
 mod config;
 mod downloader;
-mod scheduler;
 
 use anyhow::Result;
+use chrono::{Datelike, Duration, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
 use tracing_subscriber::EnvFilter;
 
@@ -27,13 +27,25 @@ impl std::fmt::Display for Frequency {
 #[command(name = "rust_downloader", about = "Binance Futures kline downloader")]
 struct Cli {
     #[command(subcommand)]
-    command: Option<Commands>,
+    command: Commands,
 }
 
 #[derive(Subcommand)]
 enum Commands {
-    /// Run the scheduler (daily at UTC 13:15)
-    Scheduler,
+    /// Download yesterday's daily data for all intervals
+    ///
+    /// Designed for external scheduler (cron / Task Scheduler).
+    /// Configure to run daily at UTC 13:15.
+    /// Built-in retry: 5 attempts with 180s backoff per symbol.
+    DailyScheduler,
+
+    /// Download previous month's monthly data for all intervals
+    ///
+    /// Designed for external scheduler (cron / Task Scheduler).
+    /// Configure to run on the 3rd of each month at UTC 00:00.
+    /// Built-in retry: 5 attempts with 180s backoff per symbol.
+    MonthlyScheduler,
+
     /// Manual download
     Download {
         /// Frequency: daily or monthly
@@ -70,6 +82,24 @@ enum Commands {
     },
 }
 
+/// Get yesterday's date string (YYYY-MM-DD) in UTC.
+fn yesterday_utc() -> String {
+    (Utc::now() - Duration::days(1))
+        .format("%Y-%m-%d")
+        .to_string()
+}
+
+/// Get previous month string (YYYY-MM) in UTC.
+fn previous_month_utc() -> String {
+    let now = Utc::now();
+    let (y, m) = if now.month() == 1 {
+        (now.year() - 1, 12)
+    } else {
+        (now.year(), now.month() - 1)
+    };
+    format!("{}-{:02}", y, m)
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     tracing_subscriber::fmt()
@@ -82,15 +112,33 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Some(Commands::Scheduler) | None => {
-            tracing::info!("Starting scheduler (next run at UTC 13:15)");
-            scheduler::run_scheduler(config).await?;
+        Commands::DailyScheduler => {
+            let date = yesterday_utc();
+            tracing::info!("DailyScheduler: downloading {}", date);
+            for interval in &config.intervals {
+                if let Err(e) = downloader::dump(&config, "daily", interval, &date).await {
+                    tracing::error!("Error downloading {}: {:#}", interval, e);
+                    std::process::exit(1);
+                }
+            }
+            tracing::info!("DailyScheduler completed");
         }
-        Some(Commands::Download {
+        Commands::MonthlyScheduler => {
+            let month = previous_month_utc();
+            tracing::info!("MonthlyScheduler: downloading {}", month);
+            for interval in &config.intervals {
+                if let Err(e) = downloader::dump(&config, "monthly", interval, &month).await {
+                    tracing::error!("Error downloading {}: {:#}", interval, e);
+                    std::process::exit(1);
+                }
+            }
+            tracing::info!("MonthlyScheduler completed");
+        }
+        Commands::Download {
             frequency,
             interval,
             date,
-        }) => {
+        } => {
             let freq = frequency.to_string();
             tracing::info!(
                 "Manual download: frequency={}, interval={}, date={}",
@@ -101,11 +149,11 @@ async fn main() -> Result<()> {
             downloader::dump(&config, &freq, &interval, &date).await?;
             tracing::info!("Download completed");
         }
-        Some(Commands::Backfill {
+        Commands::Backfill {
             start,
             end,
             interval,
-        }) => {
+        } => {
             tracing::info!(
                 "Backfill: start={}, end={}, interval={}",
                 start,
