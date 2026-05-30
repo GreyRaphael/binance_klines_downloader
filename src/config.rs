@@ -9,6 +9,8 @@ pub struct AppConfig {
     pub output_dir: String,
     pub symbols: Vec<String>,
     pub intervals: Vec<String>,
+    pub gotify_url: String,
+    pub gotify_token: String,
 }
 
 impl AppConfig {

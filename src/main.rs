@@ -1,12 +1,16 @@
 mod config;
 mod downloader;
+mod gotify;
 
 use anyhow::Result;
 use chrono::{Datelike, Duration, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
 use config::AppConfig;
+use gotify::GotifyLayer;
 
 #[derive(Debug, Clone, ValueEnum)]
 enum Frequency {
@@ -102,13 +106,16 @@ fn previous_month_utc() -> String {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
-        )
+    let config = AppConfig::load()?;
+
+    let gotify_layer = GotifyLayer::new(&config.gotify_url, &config.gotify_token);
+
+    tracing_subscriber::registry()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with(tracing_subscriber::fmt::layer())
+        .with(gotify_layer)
         .init();
 
-    let config = AppConfig::load()?;
     let cli = Cli::parse();
 
     match cli.command {
