@@ -7,6 +7,7 @@ use anyhow::{Context, Result};
 use chrono::{Datelike, Duration, NaiveDate};
 use polars::prelude::*;
 use reqwest::Client;
+use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use crate::config::AppConfig;
@@ -122,10 +123,10 @@ async fn download_one(
                 tracing::debug!("Saved {} ({} rows)", output_path, df.height());
 
                 // If monthly download, clean up daily files for this month
-                if let Some((interval, month)) = cleanup_monthly {
-                    if let Some(parent) = Path::new(output_path).parent() {
-                        cleanup_daily_files(&parent.to_string_lossy(), symbol, interval, month);
-                    }
+                if let Some((interval, month)) = cleanup_monthly
+                    && let Some(parent) = Path::new(output_path).parent()
+                {
+                    cleanup_daily_files(&parent.to_string_lossy(), symbol, interval, month);
                 }
 
                 return Ok(());
@@ -202,17 +203,32 @@ pub async fn dump(config: &AppConfig, frequency: &str, interval: &str, date: &st
             } else {
                 None
             };
-            if let Err(e) = download_one(&client, &symbol, &url, &output_path, cleanup).await {
-                tracing::error!("{}: {:#}", symbol, e);
-            }
+            download_one(&client, &symbol, &url, &output_path, cleanup).await
         });
     }
 
-    // Wait for all downloads to complete
+    // Wait for all downloads to complete, propagate first error
+    let mut first_error = None;
     while let Some(result) = join_set.join_next().await {
-        if let Err(e) = result {
-            tracing::error!("Task panicked: {:#}", e);
+        match result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                tracing::error!("Download failed: {:#}", e);
+                if first_error.is_none() {
+                    first_error = Some(e);
+                }
+            }
+            Err(e) => {
+                tracing::error!("Task panicked: {:#}", e);
+                if first_error.is_none() {
+                    first_error = Some(anyhow::anyhow!("Task panicked: {:#}", e));
+                }
+            }
         }
+    }
+
+    if let Some(e) = first_error {
+        return Err(e);
     }
 
     tracing::info!("Completed {} download for interval={}", frequency, interval);
@@ -278,6 +294,7 @@ pub async fn backfill(config: &AppConfig, interval: &str, start: &str, end: &str
         .proxy(reqwest::Proxy::all(&config.proxy)?)
         .build()?;
 
+    let semaphore = Arc::new(Semaphore::new(16));
     let mut join_set = JoinSet::new();
 
     for symbol in &config.symbols {
@@ -287,6 +304,7 @@ pub async fn backfill(config: &AppConfig, interval: &str, start: &str, end: &str
             let frequency = frequency.to_string();
             let date = date.clone();
             let interval = interval.to_string();
+            let sem = semaphore.clone();
             let url = format!(
                 "https://data.binance.vision/data/futures/um/{}/klines/{}/{}/{}-{}-{}.zip",
                 frequency, symbol, interval, symbol, interval, date
@@ -297,25 +315,41 @@ pub async fn backfill(config: &AppConfig, interval: &str, start: &str, end: &str
             );
 
             join_set.spawn(async move {
+                let _permit = sem.acquire().await.unwrap();
                 let cleanup = if frequency == "monthly" {
                     Some((interval.as_str(), date.as_str()))
                 } else {
                     None
                 };
-                if let Err(e) = download_one(&client, &symbol, &url, &output_path, cleanup).await {
-                    tracing::error!("{}: {:#}", symbol, e);
-                }
+                download_one(&client, &symbol, &url, &output_path, cleanup).await
             });
         }
     }
 
     let total = join_set.len();
-    tracing::debug!("Spawned {} download tasks", total);
+    tracing::debug!("Spawned {} download tasks (max 16 concurrent)", total);
 
+    let mut first_error = None;
     while let Some(result) = join_set.join_next().await {
-        if let Err(e) = result {
-            tracing::error!("Task panicked: {:#}", e);
+        match result {
+            Ok(Ok(())) => {}
+            Ok(Err(e)) => {
+                tracing::error!("Download failed: {:#}", e);
+                if first_error.is_none() {
+                    first_error = Some(e);
+                }
+            }
+            Err(e) => {
+                tracing::error!("Task panicked: {:#}", e);
+                if first_error.is_none() {
+                    first_error = Some(anyhow::anyhow!("Task panicked: {:#}", e));
+                }
+            }
         }
+    }
+
+    if let Some(e) = first_error {
+        return Err(e);
     }
 
     tracing::info!("Backfill completed");

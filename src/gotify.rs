@@ -55,7 +55,7 @@ where
         );
 
         tokio::spawn(async move {
-            let _ = client
+            if let Err(e) = client
                 .post(&url)
                 .form(&[
                     ("title", title.as_str()),
@@ -63,7 +63,10 @@ where
                     ("priority", &priority.to_string()),
                 ])
                 .send()
-                .await;
+                .await
+            {
+                tracing::error!("Gotify send failed: {:#}", e);
+            }
         });
     }
 }
