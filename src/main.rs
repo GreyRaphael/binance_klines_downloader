@@ -28,7 +28,7 @@ impl std::fmt::Display for Frequency {
 }
 
 #[derive(Parser)]
-#[command(name = "rust_downloader", about = "Binance Futures kline downloader")]
+#[command(name = "binance_klines_downloader", version, about = "Binance Futures kline downloader")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -53,35 +53,35 @@ enum Commands {
     /// Manual download
     Download {
         /// Frequency: daily or monthly
-        #[arg(long, value_enum)]
+        #[arg(long, short = 'f', value_enum)]
         frequency: Frequency,
 
         /// Kline interval: 5m, 15m, 30m, 1h
-        #[arg(long)]
+        #[arg(long, short = 'i')]
         interval: String,
 
         /// Date to download (daily: 2026-05-26, monthly: 2026-04)
-        #[arg(long)]
+        #[arg(long, short = 'd')]
         date: String,
     },
 
     /// Backfill historical data by date range
     ///
     /// Downloads monthly for complete months, daily for the last partial month.
-    /// Example: --start 2022-10-03 --end 2025-03-10 --interval 1h
+    /// Example: -s 2022-10-03 -e 2025-03-10 -i 1h
     ///   monthly: 2022-10, 2022-11, ..., 2025-02
     ///   daily:   2025-03-01, ..., 2025-03-10
     Backfill {
         /// Start date (inclusive, e.g. 2022-10-03)
-        #[arg(long)]
+        #[arg(long, short = 's')]
         start: String,
 
         /// End date (inclusive, e.g. 2025-03-10)
-        #[arg(long)]
+        #[arg(long, short = 'e')]
         end: String,
 
         /// Kline interval: 5m, 15m, 30m, 1h
-        #[arg(long)]
+        #[arg(long, short = 'i')]
         interval: String,
     },
 }
