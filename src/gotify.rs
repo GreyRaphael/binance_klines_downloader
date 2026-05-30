@@ -36,7 +36,7 @@ where
         let metadata = event.metadata();
         let level = metadata.level();
 
-        // 只推送 info 及以上级别
+        // 只推送 INFO 及以上级别
         if *level > Level::INFO {
             return;
         }

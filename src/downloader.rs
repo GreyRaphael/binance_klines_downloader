@@ -55,7 +55,7 @@ fn cleanup_daily_files(dir: &str, symbol: &str, interval: &str, month: &str) {
                 if let Err(e) = fs::remove_file(&path) {
                     tracing::warn!("Failed to delete {}: {:#}", path.display(), e);
                 } else {
-                    tracing::info!("Deleted daily file: {}", path.display());
+                    tracing::debug!("Deleted daily file: {}", path.display());
                 }
             }
         }
@@ -119,7 +119,7 @@ async fn download_one(
                     .with_compression(Some(IpcCompression::ZSTD(Default::default())))
                     .finish(&mut df)?;
 
-                tracing::info!("Saved {} ({} rows)", output_path, df.height());
+                tracing::debug!("Saved {} ({} rows)", output_path, df.height());
 
                 // If monthly download, clean up daily files for this month
                 if let Some((interval, month)) = cleanup_monthly {
@@ -132,7 +132,7 @@ async fn download_one(
             }
             Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => {
                 // 404: data not yet published, no point retrying
-                tracing::info!("{}: HTTP 404 — data not available yet, skipping", symbol);
+                tracing::warn!("{}: HTTP 404 — data not available yet, skipping", symbol);
                 return Ok(());
             }
             Ok(resp) => {
@@ -165,13 +165,13 @@ async fn download_one(
 /// Download and save kline data for all symbols concurrently.
 pub async fn dump(config: &AppConfig, frequency: &str, interval: &str, date: &str) -> Result<()> {
     let client = {
-        tracing::info!("Using proxy: {}", config.proxy);
+        tracing::debug!("Using proxy: {}", config.proxy);
         Client::builder()
             .proxy(reqwest::Proxy::all(&config.proxy)?)
             .build()?
     };
 
-    tracing::info!(
+    tracing::debug!(
         "Starting {} download for interval={}, date={}, symbols={:?}",
         frequency,
         interval,
@@ -267,7 +267,7 @@ pub async fn backfill(config: &AppConfig, interval: &str, start: &str, end: &str
     let end_date = NaiveDate::parse_from_str(end, "%Y-%m-%d").context("Invalid end date")?;
 
     let tasks = generate_tasks(start_date, end_date);
-    tracing::info!(
+    tracing::debug!(
         "Generated {} tasks for interval={}, symbols={:?}",
         tasks.len(),
         interval,
@@ -310,7 +310,7 @@ pub async fn backfill(config: &AppConfig, interval: &str, start: &str, end: &str
     }
 
     let total = join_set.len();
-    tracing::info!("Spawned {} download tasks", total);
+    tracing::debug!("Spawned {} download tasks", total);
 
     while let Some(result) = join_set.join_next().await {
         if let Err(e) = result {

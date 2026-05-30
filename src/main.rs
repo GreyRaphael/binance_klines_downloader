@@ -121,7 +121,7 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::DailyScheduler => {
             let date = yesterday_utc();
-            tracing::info!("DailyScheduler: downloading {}", date);
+            tracing::debug!("DailyScheduler: downloading {}", date);
             for interval in &config.intervals {
                 if let Err(e) = downloader::dump(&config, "daily", interval, &date).await {
                     tracing::error!("Error downloading {}: {:#}", interval, e);
@@ -132,7 +132,7 @@ async fn main() -> Result<()> {
         }
         Commands::MonthlyScheduler => {
             let month = previous_month_utc();
-            tracing::info!("MonthlyScheduler: downloading {}", month);
+            tracing::debug!("MonthlyScheduler: downloading {}", month);
             for interval in &config.intervals {
                 if let Err(e) = downloader::dump(&config, "monthly", interval, &month).await {
                     tracing::error!("Error downloading {}: {:#}", interval, e);
@@ -147,7 +147,7 @@ async fn main() -> Result<()> {
             date,
         } => {
             let freq = frequency.to_string();
-            tracing::info!(
+            tracing::debug!(
                 "Manual download: frequency={}, interval={}, date={}",
                 freq,
                 interval,
@@ -161,7 +161,7 @@ async fn main() -> Result<()> {
             end,
             interval,
         } => {
-            tracing::info!(
+            tracing::debug!(
                 "Backfill: start={}, end={}, interval={}",
                 start,
                 end,
