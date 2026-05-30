@@ -5,9 +5,9 @@ mod gotify;
 use anyhow::Result;
 use chrono::{Datelike, Duration, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
 
 use config::AppConfig;
 use gotify::GotifyLayer;
@@ -88,9 +88,7 @@ enum Commands {
 
 /// Get yesterday's date string (YYYY-MM-DD) in UTC.
 fn yesterday_utc() -> String {
-    (Utc::now() - Duration::days(1))
-        .format("%Y-%m-%d")
-        .to_string()
+    (Utc::now() - Duration::days(1)).format("%Y-%m-%d").to_string()
 }
 
 /// Get previous month string (YYYY-MM) in UTC.
@@ -111,7 +109,7 @@ async fn main() -> Result<()> {
     let gotify_layer = GotifyLayer::new(&config.gotify_url, &config.gotify_token);
 
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")))
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,binance_klines_downloader=debug"))) // other info, this project debug
         .with(tracing_subscriber::fmt::layer())
         .with(gotify_layer)
         .init();
@@ -141,32 +139,14 @@ async fn main() -> Result<()> {
             }
             tracing::info!("MonthlyScheduler completed");
         }
-        Commands::Download {
-            frequency,
-            interval,
-            date,
-        } => {
+        Commands::Download { frequency, interval, date } => {
             let freq = frequency.to_string();
-            tracing::debug!(
-                "Manual download: frequency={}, interval={}, date={}",
-                freq,
-                interval,
-                date
-            );
+            tracing::debug!("Manual download: frequency={}, interval={}, date={}", freq, interval, date);
             downloader::dump(&config, &freq, &interval, &date).await?;
             tracing::info!("Download completed");
         }
-        Commands::Backfill {
-            start,
-            end,
-            interval,
-        } => {
-            tracing::debug!(
-                "Backfill: start={}, end={}, interval={}",
-                start,
-                end,
-                interval
-            );
+        Commands::Backfill { start, end, interval } => {
+            tracing::debug!("Backfill: start={}, end={}, interval={}", start, end, interval);
             downloader::backfill(&config, &interval, &start, &end).await?;
             tracing::info!("Backfill completed");
         }
