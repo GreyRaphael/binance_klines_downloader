@@ -166,10 +166,14 @@ async fn download_one(
 /// Download and save kline data for all symbols concurrently.
 pub async fn dump(config: &AppConfig, frequency: &str, interval: &str, date: &str) -> Result<()> {
     let client = {
-        tracing::debug!("Using proxy: {}", config.proxy);
-        Client::builder()
-            .proxy(reqwest::Proxy::all(&config.proxy)?)
-            .build()?
+        let mut builder = Client::builder();
+        if config.proxy.is_empty() {
+            tracing::debug!("No proxy configured");
+        } else {
+            tracing::debug!("Using proxy: {}", config.proxy);
+            builder = builder.proxy(reqwest::Proxy::all(&config.proxy)?);
+        }
+        builder.build()?
     };
 
     tracing::debug!(
@@ -290,9 +294,16 @@ pub async fn backfill(config: &AppConfig, interval: &str, start: &str, end: &str
         config.symbols
     );
 
-    let client = Client::builder()
-        .proxy(reqwest::Proxy::all(&config.proxy)?)
-        .build()?;
+    let client = {
+        let mut builder = Client::builder();
+        if config.proxy.is_empty() {
+            tracing::debug!("No proxy configured");
+        } else {
+            tracing::debug!("Using proxy: {}", config.proxy);
+            builder = builder.proxy(reqwest::Proxy::all(&config.proxy)?);
+        }
+        builder.build()?
+    };
 
     let semaphore = Arc::new(Semaphore::new(16));
     let mut join_set = JoinSet::new();
