@@ -54,10 +54,5 @@ jobs:
           target: ${{ matrix.target }}
           # 自动引用当前的 Tag 创建/追加到 Release 页面
           token: ${{ secrets.GITHUB_TOKEN }}
-
-      # 单独上传配置模板（不含真实凭据），确保用户拿到二进制后可直接使用
-      - name: Upload config.toml.example
-        shell: bash
-        run: gh release upload "${{ github.ref_name }}" config.toml.example --clobber
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 将配置文件模板打进压缩包内（不含真实凭据）
+          include: config.toml.example

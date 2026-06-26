@@ -13,6 +13,7 @@ pub struct AppConfig {
     pub gotify_token: String,
     pub ntfy_url: String,
     pub ntfy_token: String,
+    pub log_dir: String,
 }
 
 impl AppConfig {

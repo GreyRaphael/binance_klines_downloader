@@ -18,6 +18,7 @@
 | `gotify_token` | Gotify 应用 Token（与 url 同时非空才推送） |
 | `ntfy_url` | Ntfy 主题地址，如 `https://ntfy.sh/mytopic`（为空则不推送） |
 | `ntfy_token` | Ntfy 访问令牌（可选，公开主题留空） |
+| `log_dir` | 日志文件输出目录（为空则不写文件，按天轮转） |
 
 ## 用法
 

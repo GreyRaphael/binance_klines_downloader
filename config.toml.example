@@ -8,6 +8,8 @@ gotify_token = ""
 ntfy_url = ""
 ntfy_token = ""
 
+log_dir = "./logs"
+
 symbols = [
     "BTCUSDT",
     "ETHUSDT",

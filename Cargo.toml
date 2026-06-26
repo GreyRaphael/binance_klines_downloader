@@ -1,6 +1,6 @@
 [package]
 name = "binance_klines_downloader"
-version = "1.1.1"
+version = "1.1.2"
 edition = "2024"
 
 [dependencies]
@@ -12,6 +12,7 @@ zip = { version = "8.6", features = ["deflate"] }
 polars = { version = "0.53", features = ["ipc", "csv"] }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry"] }
+tracing-appender = "0.2"
 anyhow = "1"
 clap = { version = "4", features = ["derive"] }
 toml = "1"

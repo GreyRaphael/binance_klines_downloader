@@ -2,6 +2,8 @@ mod config;
 mod downloader;
 mod notify;
 
+use std::io::Write;
+
 use anyhow::Result;
 use chrono::{Datelike, Duration, Utc};
 use clap::{Parser, Subcommand, ValueEnum};
@@ -108,9 +110,17 @@ async fn main() -> Result<()> {
 
     let notify_layer = NotifyLayer::new(&config.gotify_url, &config.gotify_token, &config.ntfy_url, &config.ntfy_token);
 
+    let file_writer: Box<dyn Write + Send + 'static> = if config.log_dir.is_empty() {
+        Box::new(std::io::sink())
+    } else {
+        Box::new(tracing_appender::rolling::daily(&config.log_dir, "app.log"))
+    };
+    let (non_blocking, _file_guard) = tracing_appender::non_blocking(file_writer);
+
     tracing_subscriber::registry()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,binance_klines_downloader=debug"))) // other info, this project debug
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,binance_klines_downloader=debug")))
         .with(tracing_subscriber::fmt::layer())
+        .with(tracing_subscriber::fmt::layer().with_writer(non_blocking).with_ansi(false))
         .with(notify_layer)
         .init();
 
