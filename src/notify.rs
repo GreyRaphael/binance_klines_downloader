@@ -1,4 +1,7 @@
+use std::sync::{Arc, Mutex};
+
 use reqwest::Client;
+use tokio::task::JoinHandle;
 use tracing::{Event, Level, Subscriber};
 use tracing_subscriber::Layer;
 
@@ -8,6 +11,7 @@ pub struct NotifyLayer {
     gotify_token: String,
     ntfy_url: String,
     ntfy_token: String,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl NotifyLayer {
@@ -18,6 +22,18 @@ impl NotifyLayer {
             gotify_token: gotify_token.to_string(),
             ntfy_url: ntfy_url.trim_end_matches('/').to_string(),
             ntfy_token: ntfy_token.to_string(),
+            handles: Arc::new(Mutex::new(Vec::new())),
+        }
+    }
+
+    pub fn handles(&self) -> Arc<Mutex<Vec<JoinHandle<()>>>> {
+        self.handles.clone()
+    }
+
+    pub async fn flush(handles: &Arc<Mutex<Vec<JoinHandle<()>>>>) {
+        let pending = std::mem::take(&mut *handles.lock().unwrap());
+        for h in pending {
+            let _ = h.await;
         }
     }
 
@@ -49,6 +65,14 @@ impl NotifyLayer {
         }
     }
 
+    fn spawn_send<F>(&self, f: F)
+    where
+        F: std::future::Future<Output = ()> + Send + 'static,
+    {
+        let h = tokio::spawn(f);
+        self.handles.lock().unwrap().push(h);
+    }
+
     fn send_gotify(&self, title: &str, message: &str, priority: u8) {
         let client = self.client.clone();
         let url = format!(
@@ -58,7 +82,7 @@ impl NotifyLayer {
         let title = title.to_string();
         let message = message.to_string();
 
-        tokio::spawn(async move {
+        self.spawn_send(async move {
             if let Err(e) = client
                 .post(&url)
                 .form(&[
@@ -81,7 +105,7 @@ impl NotifyLayer {
         let title = title.to_string();
         let message = message.to_string();
 
-        tokio::spawn(async move {
+        self.spawn_send(async move {
             let mut req = client.post(&url).header("Title", title.as_str());
             req = req.header("Priority", priority.to_string());
             if !token.is_empty() {

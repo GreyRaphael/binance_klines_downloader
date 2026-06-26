@@ -109,6 +109,7 @@ async fn main() -> Result<()> {
     let config = AppConfig::load()?;
 
     let notify_layer = NotifyLayer::new(&config.gotify_url, &config.gotify_token, &config.ntfy_url, &config.ntfy_token);
+    let notify_handles = notify_layer.handles();
 
     let file_writer: Box<dyn Write + Send + 'static> = if config.log_dir.is_empty() {
         Box::new(std::io::sink())
@@ -161,6 +162,8 @@ async fn main() -> Result<()> {
             tracing::info!("Backfill completed");
         }
     }
+
+    NotifyLayer::flush(&notify_handles).await;
 
     Ok(())
 }

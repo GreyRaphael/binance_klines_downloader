@@ -134,7 +134,11 @@ async fn download_one(
             }
             Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => {
                 // 404: data not yet published, no point retrying
-                tracing::warn!("{} {}: HTTP 404 — data not available yet, skipping", symbol, date);
+                tracing::warn!(
+                    "{} {}: HTTP 404 — data not available yet, skipping",
+                    symbol,
+                    date
+                );
                 return Ok(());
             }
             Ok(resp) => {
@@ -236,7 +240,12 @@ pub async fn dump(config: &AppConfig, frequency: &str, interval: &str, date: &st
         return Err(e);
     }
 
-    tracing::info!("Completed {} download for interval={}", frequency, interval);
+    tracing::info!(
+        "Completed {} download for interval={} of {}",
+        frequency,
+        interval,
+        date
+    );
     Ok(())
 }
 
