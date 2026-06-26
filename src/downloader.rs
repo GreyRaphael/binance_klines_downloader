@@ -70,6 +70,7 @@ fn cleanup_daily_files(dir: &str, symbol: &str, interval: &str, month: &str) {
 async fn download_one(
     client: &Client,
     symbol: &str,
+    date: &str,
     url: &str,
     output_path: &str,
     cleanup_monthly: Option<(&str, &str)>,
@@ -133,7 +134,7 @@ async fn download_one(
             }
             Ok(resp) if resp.status() == reqwest::StatusCode::NOT_FOUND => {
                 // 404: data not yet published, no point retrying
-                tracing::warn!("{}: HTTP 404 — data not available yet, skipping", symbol);
+                tracing::warn!("{} {}: HTTP 404 — data not available yet, skipping", symbol, date);
                 return Ok(());
             }
             Ok(resp) => {
@@ -207,7 +208,7 @@ pub async fn dump(config: &AppConfig, frequency: &str, interval: &str, date: &st
             } else {
                 None
             };
-            download_one(&client, &symbol, &url, &output_path, cleanup).await
+            download_one(&client, &symbol, &date, &url, &output_path, cleanup).await
         });
     }
 
@@ -332,7 +333,7 @@ pub async fn backfill(config: &AppConfig, interval: &str, start: &str, end: &str
                 } else {
                     None
                 };
-                download_one(&client, &symbol, &url, &output_path, cleanup).await
+                download_one(&client, &symbol, &date, &url, &output_path, cleanup).await
             });
         }
     }
