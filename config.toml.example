@@ -1,4 +1,4 @@
-proxy = "http://127.0.0.1:2080"
+proxy = ""
 output_dir = "./data"
 intervals = ["5m", "15m", "30m", "1h"]
 
