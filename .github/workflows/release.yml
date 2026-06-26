@@ -54,3 +54,5 @@ jobs:
           target: ${{ matrix.target }}
           # 自动引用当前的 Tag 创建/追加到 Release 页面
           token: ${{ secrets.GITHUB_TOKEN }}
+          # 打包配置文件模板，不含真实凭据
+          assets: config.toml.example

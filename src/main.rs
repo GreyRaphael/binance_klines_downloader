@@ -1,6 +1,6 @@
 mod config;
 mod downloader;
-mod gotify;
+mod notify;
 
 use anyhow::Result;
 use chrono::{Datelike, Duration, Utc};
@@ -10,7 +10,7 @@ use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 
 use config::AppConfig;
-use gotify::GotifyLayer;
+use notify::NotifyLayer;
 
 #[derive(Debug, Clone, ValueEnum)]
 enum Frequency {
@@ -106,12 +106,12 @@ fn previous_month_utc() -> String {
 async fn main() -> Result<()> {
     let config = AppConfig::load()?;
 
-    let gotify_layer = GotifyLayer::new(&config.gotify_url, &config.gotify_token);
+    let notify_layer = NotifyLayer::new(&config.gotify_url, &config.gotify_token, &config.ntfy_url, &config.ntfy_token);
 
     tracing_subscriber::registry()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,binance_klines_downloader=debug"))) // other info, this project debug
         .with(tracing_subscriber::fmt::layer())
-        .with(gotify_layer)
+        .with(notify_layer)
         .init();
 
     let cli = Cli::parse();
