@@ -28,7 +28,7 @@ impl std::fmt::Display for Frequency {
 }
 
 #[derive(Parser)]
-#[command(name = "binance_klines_downloader", version, about = "Binance Futures kline downloader")]
+#[command(name = "binance_klines_downloader", version, about = "Binance Futures kline downloader: https://github.com/GreyRaphael/binance_klines_downloader.git")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
