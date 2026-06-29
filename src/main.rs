@@ -53,14 +53,12 @@ enum Commands {
     MonthlyScheduler,
 
     /// Manual download
+    ///
+    /// Downloads for all intervals defined in config.toml.
     Download {
         /// Frequency: daily or monthly
         #[arg(long, short = 'f', value_enum)]
         frequency: Frequency,
-
-        /// Kline interval: 5m, 15m, 30m, 1h
-        #[arg(long, short = 'i')]
-        interval: String,
 
         /// Date to download (daily: 2026-05-26, monthly: 2026-04)
         #[arg(long, short = 'd')]
@@ -69,8 +67,9 @@ enum Commands {
 
     /// Backfill historical data by date range
     ///
+    /// Downloads for all intervals defined in config.toml.
     /// Downloads monthly for complete months, daily for the last partial month.
-    /// Example: -s 2022-10-03 -e 2025-03-10 -i 1h
+    /// Example: -s 2022-10-03 -e 2025-03-10
     ///   monthly: 2022-10, 2022-11, ..., 2025-02
     ///   daily:   2025-03-01, ..., 2025-03-10
     Backfill {
@@ -81,10 +80,6 @@ enum Commands {
         /// End date (inclusive, e.g. 2025-03-10)
         #[arg(long, short = 'e')]
         end: String,
-
-        /// Kline interval: 5m, 15m, 30m, 1h
-        #[arg(long, short = 'i')]
-        interval: String,
     },
 }
 
@@ -150,15 +145,25 @@ async fn main() -> Result<()> {
             }
             tracing::info!("MonthlyScheduler completed");
         }
-        Commands::Download { frequency, interval, date } => {
+        Commands::Download { frequency, date } => {
             let freq = frequency.to_string();
-            tracing::debug!("Manual download: frequency={}, interval={}, date={}", freq, interval, date);
-            downloader::dump(&config, &freq, &interval, &date).await?;
+            tracing::debug!("Manual download: frequency={}, date={}", freq, date);
+            for interval in &config.intervals {
+                if let Err(e) = downloader::dump(&config, &freq, interval, &date).await {
+                    tracing::error!("Error downloading {}: {:#}", interval, e);
+                    std::process::exit(1);
+                }
+            }
             tracing::info!("Download completed");
         }
-        Commands::Backfill { start, end, interval } => {
-            tracing::debug!("Backfill: start={}, end={}, interval={}", start, end, interval);
-            downloader::backfill(&config, &interval, &start, &end).await?;
+        Commands::Backfill { start, end } => {
+            tracing::debug!("Backfill: start={}, end={}", start, end);
+            for interval in &config.intervals {
+                if let Err(e) = downloader::backfill(&config, interval, &start, &end).await {
+                    tracing::error!("Error backfilling {}: {:#}", interval, e);
+                    std::process::exit(1);
+                }
+            }
             tracing::info!("Backfill completed");
         }
     }
