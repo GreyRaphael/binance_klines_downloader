@@ -37,17 +37,21 @@ binance_klines_downloader monthly-scheduler
 ### 手动下载
 
 ```bash
-binance_klines_downloader download -f daily -i 1h -d 2026-06-25
-binance_klines_downloader download -f monthly -i 1h -d 2026-05
+binance_klines_downloader download -f daily -d 2026-06-25
+binance_klines_downloader download -f monthly -d 2026-05
 ```
+
+下载 `config.toml` 中 `intervals` 配置的所有间隔。
 
 ### 回填历史数据
 
 ```bash
-binance_klines_downloader backfill -s 2022-10-03 -e 2026-06-25 -i 1h
+binance_klines_downloader backfill -s 2022-10-03 -e 2026-06-25
 ```
 
+回填 `config.toml` 中 `intervals` 配置的所有间隔。
 完整月份下载为月度数据，最后不完整月份按天下载。最大并发 16。
+起止日期在同一个月时，仅下载该日期范围内的日度数据。
 
 ## 构建
 
