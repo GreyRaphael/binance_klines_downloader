@@ -272,8 +272,13 @@ fn generate_tasks(start: NaiveDate, end: NaiveDate) -> Vec<(&'static str, String
             current.year() == end.year() && current.month() == end.month() && end < last_day;
 
         if is_partial_last {
-            // Download daily from 1st to end
-            let mut day = current;
+            // Download daily — from start if same month, otherwise from 1st
+            let day_start = if start.year() == end.year() && start.month() == end.month() {
+                start
+            } else {
+                current
+            };
+            let mut day = day_start;
             while day <= end {
                 tasks.push(("daily", day.format("%Y-%m-%d").to_string()));
                 day += Duration::days(1);
